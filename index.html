@@ -15,13 +15,12 @@
       <div class="slides">
         <!-- #/ -->
         <section>
-          <h1>Scaling LevelDB</h1>
+          <h1>SCALING LEVELDB</h1>
           <p>Bleeding fast key-value storage</p>
         </section>
         
         <!-- #/1 -->
         <section>
-          <!-- #/1 -->
           <section>
             <h2>Heads Up</h2>
             <p>
@@ -31,7 +30,6 @@
               <a target="_blank" href="http://code.google.com/p/leveldb/">http://code.google.com/p/leveldb/</a>
             </p>
           </section>
-          <!-- #/1/1 -->
           <section>
             <h2>Authors</h2>
             <p>
@@ -39,12 +37,11 @@
                 <li class="fragment"><a target="blank" href="http://research.google.com/people/jeff/">http://research.google.com/people/jeff/</a></li>
                 <li class="fragment"><a target="blank" href="http://research.google.com/people/sanjay/">http://research.google.com/people/sanjay/</a></li>
                 <li class="fragment"><br/>Also authors of:</li>
-                <li class="fragment">GFS/MapReduce/BitTable/Protocol Buffers</li>
+                <li class="fragment">GFS/MapReduce/Bigtable/Protocol Buffers</li>
                 <li class="fragment" style="float: right"><br/><small><a target="_blank" href="http://www.quora.com/What-are-all-the-Jeff-Dean-facts">- What are all the Jeff Dean facts?</a></small></li>
               </ul>
             </p>
           </section>
-          <!-- #/1/2 -->
           <section>
             <h2>Features</h2>
             <p>
@@ -61,7 +58,12 @@
               </ul>
             </p>
           </section>
-          <!-- #/1/3 -->
+          <section>
+            <h2>Killer Feature</h2>
+            <p>
+              Optimized for random writes.<br/>Better overall insert throughput.
+            </p>
+          </section>
           <section style="text-align: left">
             <h2 style="text-align: center">Benchmark</h2>
             <div>
@@ -141,77 +143,261 @@
 
         <!-- #/2 -->
         <section>
-          <h2>Killer Feature</h2>
-          <p>
-            Super fast random writes!
-          </p>
+          <section>
+            <h2>Take A Bite</h2>
+            <ul>
+              <li>Opening/Closing Database</li>
+              <li>Reads And Writes</li>
+              <li>Batch Writes</li>
+              <li>Set Options</li>
+            </ul>
+          </section>
+          <section>
+            <h2>Opening/Closing Database</h2>
+            <pre>
+              <code contenteditable class="cpp">
+
+
+
+                #include "leveldb/db.h"
+
+                leveldb::DB* db;
+                leveldb::Options options;
+                options.create_if_missing = true;
+                leveldb::Status s = 
+                  leveldb::DB::Open(options, "/tmp/testdb", &db);
+
+                // ... do something with db ...
+
+                delete db;
+
+
+
+              </code>
+            </pre>
+          </section>
+          <section>
+            <h2>Reads And Writes</h2>
+            <pre>
+              <code contenteditable class="cpp">
+
+
+
+              std::string value;
+              leveldb::Status s = 
+                db->Get(leveldb::ReadOptions(), key1, &value);
+              s = 
+                db->Put(leveldb::WriteOptions(), key2, value);
+              s = 
+                db->Delete(leveldb::WriteOptions(), key1);
+
+
+
+              </code>
+          </section>
+          <section>
+            <h2>Batch Writes</h2>
+            <pre>
+              <code contenteditable>
+
+
+
+                leveldb::WriteBatch batch;
+                batch.Put(key1, value1);
+                batch.Put(key2, value2);
+                batch.Put(key3, value3);
+                leveldb::Status s = db->Write(leveldb::WriteOptions(), &batch);
+
+
+
+              </code>
+          </section>
+          <section>
+            <h2>Set Options</h2>
+            <pre>
+              <code contenteditable>
+
+
+
+                leveldb::Options options;
+                options.create_if_missing = true;
+                options.compression = leveldb::kSnappyCompression;
+                options.write_buffer_size = (32<<20); // 32MB
+                options.block_size = (32<<10); // 32KB
+                options.block_cache = leveldb::NewLRUCache(8<<20); // 8MB
+                leveldb::Status s = leveldb::DB::Open(options, db_path, &dbs[i].db_);
+
+
+
+              </code>
+          </section>
         </section>
 
         <!-- #/3 -->
         <section>
-          <!-- #/3 -->
           <section>
-            <h2>Performance Tuning</h2>
+            <h2>Scaling Out/Up</h2>
+            <ul>
+              <li>Concurrent writers?</li>
+              <li>Sharding</li>
+              <li>Write Buffer Size</li>
+              <li>Block Size</li>
+              <li>Batch Writes</li>
+              <li>TCMalloc</li>
+            </ul>
           </section>
-          <!-- #/3/1 -->
+          <section>
+            <h2>Concurrent writers?</h2>
+            <ul>
+              <li class="fragment">LevelDB is not tuned for concurrent readers and writers</li>
+              <li class="fragment">When writes, it hold mutex and use CondVar to acquire logger between threads</li>
+              <li class="fragment">Performance degrades badly when using multiple concurrent write threads</li>
+            </ul>
+          </section>
+          <section>
+            <h3>Concurrent writers</h3>
+            <img src="./assets/images/concurrent_writers.png">
+          </section>
           <section>
             <h2>Sharding</h2>
+            <ul>
+              <li class="fragment">Hash the keys to multiple dbs</li>
+              <li class="fragment">Using multiple threads to write to dbs</li>
+              <li class="fragment">num_dbs : num_threads = 1 : 1 at best</li>
           </section>
-          <!-- #/3/2 -->
+          <section>
+            <h2>Sharding</h2>
+            <img src="./assets/images/sharding.png">
+          </section>
           <section>
             <h2>Write Buffer Size</h2>
+            <span class="fragment">Write Buffer Size => Size of memtable(default 4MB)</span>
+            <img class="fragment" src="./assets/images/write_buffer_size.png">
           </section>
-          <!-- #/3/3 -->
           <section>
             <h2>Block Size</h2>
+            <span class="fragment">Block Size => Size per data block(default 4KB)</span>
+            <img class="fragment" src="./assets/images/block_size.png">
           </section>
-          <!-- #/3/4 -->
           <section>
             <h2>Batch Writes</h2>
+            <span class="fragment">Batching writes increases performance substantially</span>
+            <img class="fragment" src="./assets/images/batch_writes.png">
           </section>
-          <!-- #/3/4 -->
           <section>
-            <h2>tcmalloc</h2>
+            <h2>TCmalloc</h2>
+            <pre>
+              <code contenteditable class="cpp">
+                export LD_PRELOAD="/usr/local/lib/libtcmalloc.so"
+              </code>
+            </pre>
+            <ul>
+              <li>num_threads: <span style="color: #FF5E99;">16</span></li>
+              <li>num_dbs: <span style="color: #FF5E99;">16</span></li>
+              <li>write_buffer_size: <span style="color: #FF5E99;">32</span>MB</li>
+              <li>block_size: <span style="color: #FF5E99;">32</span>KB</li>
+              <li>block_cache: <span style="color: #FF5E99;">8</span>MB</li>
+              <li>batch_size: <span style="color: #FF5E99;">1000</span>ops/batch</li>
+            </ul>
+            <h5>
+            > time ./run 
+            <span style="color: #FF5E99;">16 16 32 32 8 1000</span> | 
+            <span style="color: #FF5E99;">6.0</span>s | 
+            <span style="color: #FF5E99;">1046650</span>ops/sec</h5>
+            <small>
+            <a target="_blank" href="http://code.google.com/p/google-perftools/">http://code.google.com/p/google-perftools/</a>
+            </small>
           </section>
         </section>
 
         <!-- #/4 -->
         <section>
-          <!-- #/4 -->
           <section>
-            <h2>Dive into LevelDB</h2>
+            <h2>Dive Into</h2>
+            <ul>
+              <li>Write</li>
+              <li>Read</li>
+              <li>Compaction</li>
+              <li>LSM-Tree</li>
+              <li>Memtable(Skiplist)</li>
+              <li>Immutable memtable</li>
+              <li>SSTable</li>
+            </ul>
           </section>
-          <!-- #/4/1 -->
           <section>
-            <h2>Log-Structured Merge-Tree</h2>
+            <h2>Write</h2>
+            <ul>
+              <li class="fragment">Append log</li>
+              <li class="fragment">Update memtable</li>
+            </ul>
           </section>
-          <!-- #/4/2 -->
           <section>
-            <h2>memtable(skiplist)</h2>
+            <h2>Read</h2>
+            <ul>
+              <li class="fragment">Get from memtable</li>
+              <li class="fragment">Get from immutable memtable</li>
+              <li class="fragment">Get from file</li>
+            </ul>
           </section>
-          <!-- #/4/3 -->
-          <section>
-            <h2>immutable memtable</h2>
-          </section>
-          <!-- #/4/4 -->
-          <section>
-            <h2>sstable</h2>
-          </section>
-          <!-- #/4/5 -->
           <section>
             <h2>Compaction</h2>
+            <ul>
+              <li class="fragment">Probably* do Compaction when Open/Get/Write</li>
+              <li class="fragment">Separate background thread</li>
+              <li class="fragment">Multiple level Compaction</li>
+              <li class="fragment">Level 0: ?</li>
+              <li class="fragment">Level n:</li>
+              <li class="fragment">New data move from Level 0 => Level n</li>
+              <li class="fragment">Level n+1 = Level n * 10</li>
+              <li class="fragment">Merge multiple update/delete of same key</li>
+              <li class="fragment">O(Level+1) / query </li>
+            </ul>
+          </section>
+          <section>
+            <h2>Log-Structured Merge-Tree</h2>
+            Magic: Random writes => Sequential writes
+            <ul>
+              <li class="fragment">Append log</li>
+              <li class="fragment">Insert into memtable</li>
+              <li class="fragment">memtable => immutable memtable/file(sstable) ?</li>
+              <li class="fragment">SSTable Compaction</li>
+            </ul>
+          </section>
+          <section>
+            <h2>Memtable(Skiplist)</h2>
+            <ul>
+              <li class="fragment">Order by (Key+Sequence) ?</li>
+              <li class="fragment">Skiplist > B+ Tree ?</li>
+              <li class="fragment">mmap => file(Level 0) ?</li>
+            </ul>
+          </section>
+          <section>
+            <h2>Immutable memtable</h2>
+            <ul>
+              <li class="fragment">Frozen memtable ?</li>
+            </ul>
+          </section>
+          <section>
+            <h2>SSTable</h2>
+            <ul>
+              <li class="fragment">Data Block</li>
+              <li class="fragment">Meta Block</li>
+              <li class="fragment">Meta Index Block</li>
+              <li class="fragment">Data Index Block</li>
+              <li class="fragment">Footer</li>
+            </ul>
           </section>
         </section>
-        
+
         <!-- #/5 -->
         <section>
           <section>
-            <h2>Reference</h2>
+            <h2>References</h2>
             <ul>
               <li>Introduction</li>
-              <li>Official Documentation</li>
-              <li>Internal Implementation</li>
-              <li>Papers</li>
+              <li>Documentation</li>
+              <li>Implementation</li>
+              <li>Paper</li>
             </ul>
           </section>
           <section>
@@ -223,7 +409,7 @@
             </ul>
           </section>
           <section>
-            <h2>Official Documentation</h2>
+            <h2>Documentation</h2>
             <ul>
               <li><a target="_blank" href="http://leveldb.googlecode.com/svn/trunk/doc/index.html">index.html</a></li>
               <li><a target="_blank" href="http://leveldb.googlecode.com/svn/trunk/doc/benchmark.html">benchmark.html</a></li>
@@ -233,26 +419,26 @@
             </ul>
           </section>
           <section>
-            <h2>Internal Implementation</h2>
+            <h2>Implementation</h2>
             <ul>
               <li><a target="_blank" href="http://www.cnblogs.com/haippy/archive/2011/12/04/2276064.html">LevelDB日知录</a></li>
               <li><a target="_blank" href="http://rdc.taobao.com/blog/cs/?p=1378">LevelDB实现解析</a></li>
             </ul>
           </section>
           <section>
-            <h2>Papers</h2>
+            <h2>Paper</h2>
             <ul>
-              <li><a target="_blank" href="http://blademaster.ixiezi.com/2010/03/27/bigtable：一个分布式的结构化数据存储系统中文版/">BigTable</a></li>
-              <li><a target="_blank" href="http://blademaster.ixiezi.com/2010/03/27/google-mapreduce中文版/">MapReduce</a></li>
-              <li><a target="_blank" href="http://blademaster.ixiezi.com/2010/03/27/the-google-file-system中文版/">Google File System</a></li>
               <li><a target="_blank" href="http://staff.ustc.edu.cn/~jpq/paper/flash/1996-The%20Log-Structured%20Merge-Tree%20%28LSM-Tree%29.pdf">The Log-Structured Merge-Tree</a></li>
+              <li><a target="_blank" href="http://static.googleusercontent.com/external_content/untrusted_dlcp/research.google.com/zh-CN//archive/bigtable-osdi06.pdf">Bigtable</a></li>
+              <li><a target="_blank" href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.15.9072&rep=rep1&type=pdf">Skip Lists</a></li>
             </ul>
           </section>
         </section>
         
+        <!-- #/6 -->
         <section>
           <h1>THE END</h1>
-          <p>INF@FW 2012.01</p>
+          <p>INF 2012.01</p>
         </section>
       </div>
 
