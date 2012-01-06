@@ -149,7 +149,9 @@
               <li>Opening/Closing Database</li>
               <li>Reads And Writes</li>
               <li>Batch Writes</li>
-              <li>Set Options</li>
+              <li>Iteration</li>
+              <li>Comparator</li>
+              <li>Options</li>
             </ul>
           </section>
           <section>
@@ -212,7 +214,69 @@
               </code>
           </section>
           <section>
-            <h2>Set Options</h2>
+            <h2>Iteration</h2>
+            <pre class="fragment">
+              <code contenteditable>
+
+                leveldb::Iterator* it = 
+                  db->NewIterator(leveldb::ReadOptions());
+                
+                for (it->SeekToFirst();
+                     it->Valid();
+                     it->Next()) {
+                  cout << it->key().ToString() << ": ";
+                  cout << it->value().ToString() << endl;
+                }
+
+                for (it->SeekToLast();
+                     it->Valid();
+                     it->Prev()) {
+                  ...
+                }
+
+                for (it->Seek(start);
+                     it->Valid() && it->key().ToString() < limit;
+                     it->Next()) {
+                  ...
+                }
+
+              </code>
+          </section>
+          <section>
+            <h2>Comparator</h2>
+            <pre class="fragment">
+              <code contenteditable>
+
+                class TwoPartComparator : public leveldb::Comparator {
+                  public:
+                    int Compare(const leveldb::Slice& a, const leveldb::Slice& b) const {
+                      int a1, a2, b1, b2;
+                      ParseKey(a, &a1, &a2);
+                      ParseKey(b, &b1, &b2);
+                      if (a1 < b1) return -1;
+                      if (a1 > b1) return +1;
+                      if (a2 < b2) return -1;
+                      if (a2 > b2) return +1;
+                      return 0;
+                    }
+
+                    // Ignore the following methods for now:
+                    const char* Name()
+                    void FindShortestSeparator()
+                    void FindShortSuccessor()
+                };
+
+                TwoPartComparator cmp;
+                leveldb::DB* db;
+                leveldb::Options options;
+                options.create_if_missing = true;
+                options.comparator = &cmp;
+                leveldb::DB::Open(options, "/tmp/testdb", &db);
+
+              </code>
+          </section>
+          <section>
+            <h2>Options</h2>
             <pre class="fragment">
               <code contenteditable>
 
