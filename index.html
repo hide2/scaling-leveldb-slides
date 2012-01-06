@@ -425,7 +425,7 @@
                 <li class="fragment">Ordered by (Key+kType+Sequence)</li>
                 <li class="fragment">No duplicate insertion/No deletion</li>
                 <li class="fragment">Immutable Memtable(Frozen from Memtable)</li>
-                <li class="fragment">Skip List</li>
+                <li class="fragment">Skip List: O(logN)</li>
               </ul>
             </p>
             <div class="fragment" style="font-size: 30px;">
@@ -453,6 +453,7 @@
               <li class="fragment">Sequence of entries sorted by key</li>
               <li class="fragment">MANIFEST: levels, SSTable files, key ranges</li>
               <li class="fragment">Level 0 SSTables may contain overlapping keys</li>
+              <li class="fragment">Key prefix compression/Restart Point</li>
             </ul>
             <p style="margin-top: 30px">
               <ul class="fragment" style="list-style: none;">
